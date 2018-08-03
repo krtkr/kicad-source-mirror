@@ -490,6 +490,23 @@ class FootprintWizardDrawingAids:
         outline.SetStartEnd(start, end)
         self.module.Add(outline)
 
+    def Text(self, x, y, size, text_string):
+        """
+        Draw a text a (x,y) with 'text_string'
+        """
+        text_mdl = pcbnew.TEXTE_MODULE(self.module)
+
+        text_size = pcbnew.wxSize(size, size)
+        text_pos = self.TransformPoint(x, y)
+
+        text_mdl.SetText(text_string)
+        text_mdl.SetPos0(text_pos)
+        text_mdl.SetPosition(text_pos)
+        text_mdl.SetTextSize(text_size)
+        text_mdl.SetTextAngle(0*10)
+        text_mdl.SetLayer(self.DefaultTextValueLayer())
+        self.module.Add(text_mdl)
+
     def Circle(self, x, y, r, filled=False):
         """!
         Draw a circle at (x,y) of radius r
