@@ -38,14 +38,19 @@ class BGAWizard(FootprintWizardBase.FootprintWizard):
         return "Ball Grid Array Footprint Wizard"
 
     def GenerateParameterList(self):
-        self.AddParam("Pads", "pitch", self.uMM, 1, designator='p')
-        self.AddParam("Pads", "size", self.uMM, 0.5)
+        self.AddParam("Pads", "pitch", self.uMM, 1, designator='P')
+        self.AddParam("Pads", "pad_size", self.uMM, 0.5, designator='Pad')
         self.AddParam("Pads", "columns", self.uInteger, 5, designator="nx")
         self.AddParam("Pads", "rows", self.uInteger, 5, designator="ny")
+        self.AddParam("Pads", "override", self.uBool, False, hint="Override default pins count for name, use if going to delete some pads after footprint creation")
+        self.AddParam("Pads", "pads_count", self.uInteger, 25, hint="Pads count used if override is enabled")
 
         self.AddParam("Package", "width", self.uMM, 6, designator='X')
         self.AddParam("Package", "length", self.uMM, 6, designator='Y')
+        self.AddParam("Package", "ball_size", self.uMM, 0.6, designator='Ball')
         self.AddParam("Package", "margin", self.uMM, 0.25, min_value=0.2, hint="Courtyard margin")
+
+        self.AddParam("SilkS", "bevel", self.uMM, 1.0, min_value=0.2)
 
     def CheckParameters(self):
 
@@ -58,14 +63,20 @@ class BGAWizard(FootprintWizardBase.FootprintWizard):
         self.CheckParam('Package','length',min_value=length,info="Package length is too small (< {l}mm".format(l=length))
 
     def GetValue(self):
-        pins = (self.parameters["Pads"]["rows"] * self.parameters["Pads"]["columns"])
+        if (self.parameters["Pads"]["override"]):
+            pins = self.parameters["Pads"]["pads_count"]
+        else:
+            pins = (self.parameters["Pads"]["rows"] * self.parameters["Pads"]["columns"])
 
-        return "BGA-{n}_{a}x{b}_{x}x{y}mm".format(
+        return "BGA-{n}_{x}x{y}mm_Layout{a}x{b}_P{P}mm_Ball{B}mm_Pad{p}mm_NSMD".format(
                 n = pins,
                 a = self.parameters['Pads']['columns'],
                 b = self.parameters['Pads']['rows'],
                 x = pcbnew.ToMM(self.parameters['Package']['width']),
-                y = pcbnew.ToMM(self.parameters['Package']['length'])
+                y = pcbnew.ToMM(self.parameters['Package']['length']),
+                P = pcbnew.ToMM(self.parameters['Pads']['pitch']),
+                B = pcbnew.ToMM(self.parameters['Package']['ball_size']),
+                p = pcbnew.ToMM(self.parameters['Pads']['pad_size'])
             )
 
     def BuildThisFootprint(self):
@@ -74,12 +85,12 @@ class BGAWizard(FootprintWizardBase.FootprintWizard):
 
         rows = pads["rows"]
         cols = pads["columns"]
-        pad_size = pads["size"]
+        pad_size = pads["pad_size"]
         pad_size = pcbnew.wxSize(pad_size, pad_size)
         pad_pitch = pads["pitch"]
 
         # add in the pads
-        pad = PA.PadMaker(self.module).SMTRoundPad(pads["size"])
+        pad = PA.PadMaker(self.module).SMTRoundPad(pads["pad_size"])
 
         pin1_pos = pcbnew.wxPoint(-((cols - 1) * pad_pitch) / 2,
                                   -((rows - 1) * pad_pitch) / 2)
@@ -92,9 +103,11 @@ class BGAWizard(FootprintWizardBase.FootprintWizard):
         ssx = self.parameters['Package']['width'] / 2
         ssy = self.parameters['Package']['length'] / 2
 
+	bevel = self.parameters['SilkS']['bevel']
+
         # Bevel should be 1mm nominal but we'll allow smaller values
-        if pcbnew.ToMM(ssx) < 1:
-            bevel = ssx
+        if pcbnew.ToMM(bevel) < 1:
+            bevel = bevel
         else:
             bevel = pcbnew.FromMM(1)
 
@@ -160,6 +173,7 @@ class BGAWizard(FootprintWizardBase.FootprintWizard):
         ypos = ssy + text_size
         self.draw.Value(0, ypos, text_size)
         self.draw.Reference(0, -ypos, text_size)
+        self.draw.Text(0, 0, text_size, "%R")
 
         # set SMD attribute
         self.module.SetAttributes(pcbnew.MOD_CMS)
